@@ -1,0 +1,17 @@
+baseURL = "https://parapapapapa.github.io/"
+languageCode = "en-us"
+title = "Guillaume Barrois's blog"
+theme = "hugo-bearblog"
+
+[params]
+  description = "Notes on model systems engineering."
+  # favicon, author, etc. — see exampleSite for what this theme supports
+
+[[menu.main]]
+  name = "Home"
+  identifier = "home"
+  url = "/"
+[[menu.main]]
+  name = "Blog"
+  identifier = "blog"
+  url = "/blog/"

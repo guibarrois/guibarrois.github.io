@@ -1,4 +1,4 @@
-baseURL = "https://parapapapapa.github.io/"
+baseURL = "https://guibarrois.github.io/"
 languageCode = "en-us"
 title = "Guillaume Barrois's blog"
 theme = "hugo-bearblog"

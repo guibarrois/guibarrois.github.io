@@ -18,7 +18,7 @@
 				<link>https://guibarrois.github.io/blog/kv-cache/</link>
 				<pubDate>Wed, 15 Jul 2026 22:22:23 +0200</pubDate>
 				<guid>https://guibarrois.github.io/blog/kv-cache/</guid>
-				<description>&lt;h1 id=&#34;kv-cache&#34;&gt;KV cache&lt;/h1&gt;&#xA;&lt;p&gt;Implementing KV cache is the standard exercise for everyone trying to get a deeper understanding of transformer&#xA;architecture, so I decided to do a deep dive on it to be sure I understand it well.&lt;/p&gt;&#xA;&lt;p&gt;We are going to go through the computations taking place in the attention layer and then observe how the&#xA;addition of KV cache makes the quadratic term disappear. We will also compare it to results obtained with a&#xA;simple KV cache implementation.&lt;/p&gt;</description>
+				<description>&lt;p&gt;Implementing KV cache is the standard exercise for everyone trying to get a deeper understanding of transformer&#xA;architecture, so I decided to do a deep dive on it to be sure I understand it well.&lt;/p&gt;&#xA;&lt;p&gt;We are going to go through the computations taking place in the attention layer and then observe how the&#xA;addition of KV cache makes the quadratic term disappear. We will also compare it to results obtained with a&#xA;simple KV cache implementation.&lt;/p&gt;</description>
 			</item>
 	</channel>
 </rss>

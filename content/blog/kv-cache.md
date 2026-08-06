@@ -7,12 +7,14 @@ description = "A from-scratch walkthrough of the KV cache: counting the computat
 tags = ["ml-systems", "inference"]
 +++
 
-Implementing KV cache is the standard exercise for everyone trying to get a deeper understanding of transformer 
-architecture, so I decided to do a deep dive on it to be sure I understand it well.
+To get a deeper understanding of transformer architecture, I wanted to explore in details KV cache and its 
+consequences.
 
-We are going to go through the computations taking place in the attention layer and then observe how the 
-addition of KV cache makes the quadratic term disappear. We will also compare it to results obtained with a
-simple KV cache implementation.
+In this post I propose to:
+- go through the computations taking place in the attention layer to understand its drivers,
+- observe how the addition of KV cache makes the quadratic term disappear and compute the theoretical gains,
+- compare the theoretical results to those obtained with a simple KV cache implementation,
+- explain in details the memory / cpu tradeoff, and why moderns llms are so heavy in memory.
 
 Let's dive in !
 
@@ -27,9 +29,9 @@ And I think to myself what a wonderful
 
 And we want to predict the next token.
 
-The context will therefore be `to myself what a wonderful`. The first step of the attention layer 
-consists in retrieving the embedding of each token. It is a simple lookup table, so no computation here.
-We obtain 5 vectors of `emb_size` length, let's say 128 in our case.
+Let say that the context window begins with `to myself what a wonderful`. The first step of the attention 
+layer consists in retrieving the embedding of each token. It is a simple lookup table, so no computation 
+here. We obtain 5 vectors of `emb_size` length, let's say 128 in our case.
 
 In the transformer architecture, you notoriously then have to compute for each forward pass three matrices,
 K (key), Q (query) and V (value) that are then combined.
@@ -42,8 +44,8 @@ How much computation is that? A linear layer does `K = x @ Aᵀ + b`. In our cas
 - A is `(emb_size, emb_size) = (128, 128)`
 - b is `(1, emb_size) = (1, 128)`
 
-The number of computations is therefore three times (for K, V and Q):
-`2 * seq_length * emb_size * emb_size + seq_length * emb_size = 2 * 5 * 128 * 128 + 5 * 128`
+The number of computations is therefore (summing for K, V and Q):
+`3 * (2 * seq_length * emb_size * emb_size + seq_length * emb_size) = 6 * 2 * 5 * 128 * 128 + 5 * 128`
 
 After that, we compute an intermediary matrix that represents the weights (W): how much token\[i\] attends
 to token\[j\]:
@@ -147,7 +149,9 @@ We should therefore end up with a ratio between the two versions that increases 
 
 ## Experiments
 
-To reproduce those results, I implemented a toy model with and without KV cache. With this model, we can:
+To reproduce those results, I implemented a toy model with and without KV cache
+(code and benchmarks: [github.com/guibarrois/kv-cache](https://github.com/guibarrois/kv-cache)).
+With this model, we can:
 1. Evaluate the flops using the handy `FlopCounterMode` of torch
 2. Evaluate the latency
 
@@ -167,15 +171,17 @@ Let's now look at the latency:
 
 Here, the picture is more blurry: the improvement is real, but it goes from ~6x at short context to
 ~38x at 1024 tokens — far from the 1024x that the FLOP count promises. That should not surprise us:
-FLOPs are not the only thing that takes time. Latency is also built by fixed costs that do not shrink
-with the FLOPs (kernel launches, memory access, Python dispatch). The version without cache at least
-keeps the CPU busy doing actual arithmetic.
+FLOPs are not the only thing that takes time. Latency is also built by costs that do not shrink
+with the FLOPs. Those cost are fixed costs (kernel launch for instance), but probably mainly
+to the memory access that is now required to write the cached values.
 
+Let's investigate that more in details.
 
-## Memory vs FLOP tradeoff
+## The memory vs FLOP tradeoff
 
-But what did we spend in memory to save this amount of FLOPs? K and V are both of size `seq_length * emb_size`, 
-so for 32 bits floats the cache takes `4 * 2 * seq_length * emb_size` bytes:
+We have demonstrated a reduction in FLOPs, but what did we spend in memory? K and V are both of 
+size `seq_length * emb_size`, so for 32 bits floats the cache takes `4 * 2 * seq_length * emb_size` 
+bytes:
 
 | seq length (emb_size = 128)                   | 16    | 128  | 256  | 512  | 1024 | 2048 |
 |---------------------------------------------- |-------|------|------|------|------|------|
@@ -183,6 +189,16 @@ so for 32 bits floats the cache takes `4 * 2 * seq_length * emb_size` bytes:
 
 That is not a negligible amount, in particular when seq length grows and when there are multiple
 attention layers, since each layer keeps its own K and V.
+
+In my implementation, I used `torch.cat` to concatenate the new K and V rows with the cached
+matrices. It implies each time reallocating `O(seq_length)` bytes in memory. So at the
+same time we save latency on FLOPs, we degrade it with inefficient memory allocation, which 
+explains partly why the latency ratio above climb slower than expected.
+
+In more efficient implementations, a buffer for the KV cache is pre-allocated, which make
+turns it into an `O(1)` step.
+
+### Real world memory footprint
 
 In the real world, the number of layers goes from ~10 to ~100, but there is also half precision
 (32 bits floats -> 16 bits floats) and GQA. GQA (grouped-query attention) consists in sharing one
@@ -192,11 +208,11 @@ by as much.
 
 Putting it together, the cache costs `2 (K and V) * n_layers * kv_width * 2 bytes` per token:
 
-| Model        | Layers | Embedding size | GQA      | KV width | Memory per token (fp16) | Max context | Cache at max context |
-|--------------|--------|----------------|----------|----------|-------------------------|-------------|----------------------|
-| GPT-2 small  | 12     | 768            | No       | 768      | 0.04 MB                 | 1k          | 38 MB                |
-| Llama-3-8B   | 32     | 4096           | Yes (4x) | 1024     | 0.13 MB                 | 128k        | 17 GB                |
-| Llama-3-70B  | 80     | 8192           | Yes (8x) | 1024     | 0.33 MB                 | 128k        | 43 GB                |
+| Model          | Layers | Embedding size | GQA      | KV width | Memory per token (fp16) | Max context | Cache at max context |
+|----------------|--------|----------------|----------|----------|-------------------------|-------------|----------------------|
+| GPT-2 small    | 12     | 768            | No       | 768      | 0.04 MB                 | 1k          | 38 MB                |
+| Llama-3.1-8B   | 32     | 4096           | Yes (4x) | 1024     | 0.13 MB                 | 128k        | 17 GB                |
+| Llama-3.1-70B  | 80     | 8192           | Yes (8x) | 1024     | 0.33 MB                 | 128k        | 43 GB                |
 
 At full context, that is ~43 GB of cache for a single sequence on the 70B model. This is why the KV cache, not compute, 
 is often what limits context length and batch size in real deployments.

@@ -7,14 +7,14 @@ description = "A from-scratch walkthrough of the KV cache: counting the computat
 tags = ["ml-systems", "inference"]
 +++
 
-To get a deeper understanding of transformer architecture, I wanted to explore in details KV cache and its 
+To get a deeper understanding of transformer architecture, I wanted to explore in detail KV cache and its 
 consequences.
 
 In this post I propose to:
 - go through the computations taking place in the attention layer to understand its drivers,
 - observe how the addition of KV cache makes the quadratic term disappear and compute the theoretical gains,
 - compare the theoretical results to those obtained with a simple KV cache implementation,
-- explain in details the memory / cpu tradeoff, and why moderns llms are so heavy in memory.
+- explain in detail the memory / cpu tradeoff, and why modern llms are so heavy in memory.
 
 Let's dive in !
 
@@ -45,7 +45,7 @@ How much computation is that? A linear layer does `K = x @ Aᵀ + b`. In our cas
 - b is `(1, emb_size) = (1, 128)`
 
 The number of computations is therefore (summing for K, V and Q):
-`3 * (2 * seq_length * emb_size * emb_size + seq_length * emb_size) = 6 * 2 * 5 * 128 * 128 + 5 * 128`
+`3 * (2 * seq_length * emb_size * emb_size + seq_length * emb_size) = 6 * 5 * 128 * 128 + 5 * 128`
 
 After that, we compute an intermediary matrix that represents the weights (W): how much token\[i\] attends
 to token\[j\]:
@@ -172,10 +172,10 @@ Let's now look at the latency:
 Here, the picture is more blurry: the improvement is real, but it goes from ~6x at short context to
 ~38x at 1024 tokens — far from the 1024x that the FLOP count promises. That should not surprise us:
 FLOPs are not the only thing that takes time. Latency is also built by costs that do not shrink
-with the FLOPs. Those cost are fixed costs (kernel launch for instance), but probably mainly
+with the FLOPs. Those costs are fixed costs (kernel launch for instance), but probably mainly
 to the memory access that is now required to write the cached values.
 
-Let's investigate that more in details.
+Let's investigate that more in detail.
 
 ## The memory vs FLOP tradeoff
 
@@ -193,10 +193,10 @@ attention layers, since each layer keeps its own K and V.
 In my implementation, I used `torch.cat` to concatenate the new K and V rows with the cached
 matrices. It implies each time reallocating `O(seq_length)` bytes in memory. So at the
 same time we save latency on FLOPs, we degrade it with inefficient memory allocation, which 
-explains partly why the latency ratio above climb slower than expected.
+explains partly why the latency ratio above climbs slower than expected.
 
 In more efficient implementations, a buffer for the KV cache is pre-allocated, which make
-turns it into an `O(1)` step.
+turns it into a `O(1)` step.
 
 ### Real world memory footprint
 
@@ -243,5 +243,5 @@ in the general case of attention. For instance in the BERT architecture, attenti
 causal, therefore the KV cache can not be applied.
 
 
-_Text written by me, proofread using claude. Scripts written by me, improved using claude. Schema
+_Text written by me, proofread using claude. Scripts written by me, improved using claude. Schemas
 were generated using claude._

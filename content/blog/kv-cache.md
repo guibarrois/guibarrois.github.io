@@ -15,6 +15,7 @@ In this post I propose to:
 - observe how the addition of KV cache makes the quadratic term disappear and compute the theoretical gains,
 - compare the theoretical results to those obtained with a simple KV cache implementation,
 - explain in detail the memory / cpu tradeoff, and why modern llms are so heavy in memory.
+- see why checking the generated tokens is not enough to know whether your cache actually works.
 
 Let's dive in !
 
@@ -155,7 +156,16 @@ With this model, we can:
 1. Evaluate the flops using the handy `FlopCounterMode` of torch
 2. Evaluate the latency
 
-Let's look at the FLOPs for each seq length:
+An important and interesting lesson learned during this exercise was that it
+is most often impossible to spot bugs by looking at the output: cache might 
+be non-functional but the model can still deliver the right tokens. The only
+way to 
+
+Let's look at the FLOPs for each seq length: this curve is the only reliable 
+test that the cache is doing anything. A cache that silently recomputes 
+everything still produces exactly the right tokens. Mine did, for a while. 
+Comparing outputs cannot detect that, the FLOP ratio can, because a non-functional cache 
+leaves it flat at 1 instead of growing with sequence length.
 
 ![FLOPs to predict one token, with and without KV cache](/images/kv-cache-flops.png)
 

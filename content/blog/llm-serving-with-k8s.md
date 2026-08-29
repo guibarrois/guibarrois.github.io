@@ -24,15 +24,20 @@ POST /llm-api/generate
 {"response": "Paris.", "code": 200}
 ```
 
-In the process, we will also dive a little bit about cache and memory management in k8s in order to 
+In the process, we will also dive in cache and memory management in k8s in order to 
 understand some strange behaviors.
 
 Let's dive in.
 
 ## Architecture
 
-At the risk of killing the vibe, serving an LLM is not very different of serving any API: you need to
-ensure that you can serve the requests from your user, with a latency that is acceptable. For an LLM
-the specificity is in the fact that:
+Serving an LLM is not very different of serving any API: you have a certain load corresponding 
+to a given number of requests by seconds (req/s), you want to serve all of them with a latency
+(measured for instance by the p99 latency) that is acceptable. You want to do that with a number
+of failure (fail/s) that stays below a threshold.
+
+Serving an LLM has some specificities:
 - generation requires a lot of memory to compute efficiently the forward pass,
 - latency is generally in the order of magnitude of seconds.
+
+

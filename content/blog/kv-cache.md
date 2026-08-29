@@ -14,21 +14,20 @@ In this post I propose to:
 - go through the computations taking place in the attention layer to understand its drivers,
 - observe how the addition of KV cache makes the quadratic term disappear and compute the theoretical gains,
 - compare the theoretical results to those obtained with a simple KV cache implementation,
-- explain in detail the memory / cpu tradeoff, and why modern llms are so heavy in memory.
+- explain in detail the memory / cpu tradeoff, and why modern LLMS are so heavy in memory.
 - see why checking the generated tokens is not enough to know whether your cache actually works.
 
 Let's dive in !
 
 ## Computation cost of attention
 
-Let's consider that each word is a token, and that our model is a next token predictor. We have processed so
-far:
+Let's consider that each word is a token, and that our model is a next token predictor. We have processed so far:
 
 ```
 And I think to myself what a wonderful
 ```
 
-And we want to predict the next token.
+That is the prefill. Now we want to generate a new token, that is decoding.
 
 Let say that the context window begins with `to myself what a wonderful`. The first step of the attention 
 layer consists in retrieving the embedding of each token. It is a simple lookup table, so no computation 
@@ -85,20 +84,23 @@ the most useful to do its attention job. Now we want to project it back into the
 out_proj = out @ B + b
 ```
 
+This is what give us the logits, then transforms into probability. The generation of the 
+token according to the probability is the end of thuis decoding step.
+
 Again that's `2 * seq_length * emb_size * emb_size + seq_length * emb_size = 2 * 5 * 128 * 128 + 5 * 128`
 
 Let's put together all the computation costs:
 
-K, V, Q -> `6 * seq_length * emb_size^2 + 3 * seq_length * emb_size`
-W and softmax -> `2 * seq_length^2 * emb_size + 3 * seq_length^2 = seq_length^2 * (2 * emb_size + 3)`
-out -> `2 * seq_length^2 * emb_size`
-Projection -> `2 * seq_length * emb_size^2 + seq_length * emb_size`
+K, V, Q -> `6 * seq_length * emb_size² + 3 * seq_length * emb_size`
+W and softmax -> `2 * seq_length² * emb_size + 3 * seq_length² = seq_length² * (2 * emb_size + 3)`
+out -> `2 * seq_length² * emb_size`
+Projection -> `2 * seq_length * emb_size² + seq_length * emb_size`
 
-This is of the form: `seq_length^2*a + seq_length*b (with a and b different constants from the formula above)`
+This is of the form: `seq_length²*a + seq_length*b (with a and b different constants from the formula above)`
 
 ## KV cache
 
-If you go back to the previous computation, you realise that when the context grows, 
+If you go back to the previous computation, you realise that when the decoding continues to the next token, 
 a lot of the computations are repeated:
 - the K, V and Q matrices have rows that correspond to each token, so when the context grows,
   only the last row (last token) in the context is new. All the other rows are
@@ -123,19 +125,19 @@ which costs this time respectively:
 ```
 2 * 1 * seq_length * emb_size = 2 * 1 * 5 * 128
 2 * 1 * seq_length * emb_size = 2 * 1 * 5 * 128
-2 * emb_size^2 + emb_size
+2 * emb_size² + emb_size
 ```
-And here, you can see that the factor that was ~seq_length^2 becomes ~seq_length
+And here, you can see that the factor that was ~seq_length² becomes ~seq_length
 
 Therefore, the final form of the computation is something of `seq_length*c + d`! Now we can compare
 the computation costs with and without KV cache, step by step:
 
 | computation   | without cache                                             | with cache                                   |
 |---------------|-----------------------------------------------------------|----------------------------------------------|
-| K, Q, V       | `6 * seq_length * emb_size^2 + 3 * seq_length * emb_size` | `6 * emb_size^2 + 3 * emb_size`              |
-| W and softmax | `2 * seq_length^2 * emb_size + 3 * seq_length^2`          | `2 * seq_length * emb_size + 3 * seq_length` |
-| out           | `2 * seq_length^2 * emb_size`                             | `2 * seq_length * emb_size`                  |
-| projection    | `2 * seq_length * emb_size^2 + seq_length * emb_size`     | `2 * emb_size^2 + emb_size`                  |
+| K, Q, V       | `6 * seq_length * emb_size² + 3 * seq_length * emb_size` | `6 * emb_size² + 3 * emb_size`              |
+| W and softmax | `2 * seq_length² * emb_size + 3 * seq_length²`          | `2 * seq_length * emb_size + 3 * seq_length` |
+| out           | `2 * seq_length² * emb_size`                             | `2 * seq_length * emb_size`                  |
+| projection    | `2 * seq_length * emb_size² + seq_length * emb_size`     | `2 * emb_size² + emb_size`                  |
 
 Each cell of the "without cache" column is exactly `seq_length` times the corresponding
 cell of the "with cache" column. We could have seen that coming: intuitively, a full forward pass 
@@ -158,14 +160,13 @@ With this model, we can:
 
 An important and interesting lesson learned during this exercise was that it
 is most often impossible to spot bugs by looking at the output: cache might 
-be non-functional but the model can still deliver the right tokens. The only
-way to 
+be non-functional but the model can still deliver the right tokens. 
 
 Let's look at the FLOPs for each seq length: this curve is the only reliable 
 test that the cache is doing anything. A cache that silently recomputes 
 everything still produces exactly the right tokens. Mine did, for a while. 
-Comparing outputs cannot detect that, the FLOP ratio can, because a non-functional cache 
-leaves it flat at 1 instead of growing with sequence length.
+Comparing outputs cannot detect that but the FLOP ratio can: a non-functional cache 
+would leave it flat at 1 instead of growing with sequence length.
 
 ![FLOPs to predict one token, with and without KV cache](/images/kv-cache-flops.png)
 
@@ -201,9 +202,10 @@ That is not a negligible amount, in particular when seq length grows and when th
 attention layers, since each layer keeps its own K and V.
 
 In my implementation, I used `torch.cat` to concatenate the new K and V rows with the cached
-matrices. It implies each time reallocating `O(seq_length)` bytes in memory. So at the
-same time we save latency on FLOPs, we degrade it with inefficient memory allocation, which 
-explains partly why the latency ratio above climbs slower than expected.
+matrices. It implies each time reallocating `O(seq_length)` bytes in memory: so this is something
+in the order of magnitude of `O(N²)` over the whole sequence. So at same time we save 
+latency on FLOPs, we degrade it with inefficient memory allocation, which explains partly why 
+the latency ratio above climbs slower than expected.
 
 In more efficient implementations, a buffer for the KV cache is pre-allocated, which make
 turns it into a `O(1)` step.

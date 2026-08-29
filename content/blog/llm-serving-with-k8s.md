@@ -31,13 +31,26 @@ Let's dive in.
 
 ## Architecture
 
-Serving an LLM is not very different of serving any API: you have a certain load corresponding 
-to a given number of requests by seconds (req/s), you want to serve all of them with a latency
-(measured for instance by the p99 latency) that is acceptable. You want to do that with a number
-of failure (fail/s) that stays below a threshold.
+I see serving an API as optimizing around four metrics (Google's four golden signals
+of monitoring):
+- there is a certain load corresponding to a given number of requests by seconds (req/s),
+- you want to serve all of them with an acceptable latency (measured for instance 
+by the p9X latency) that is acceptable. 
+- You want to do that with a number of failure (errors/s) that stays below a threshold.
+- You don't won't you ressources to be saturated (%cpu or memory used).
 
-Serving an LLM has some specificities:
+Serving an LLM is not different, though is has:
 - generation requires a lot of memory to compute efficiently the forward pass,
-- latency is generally in the order of magnitude of seconds.
+- acceptable latency is generally in the order of magnitude of seconds.
+
+How does that translate in terms of architecture? In order not to deny request,
+it might be a good idea to have an asynchronous system, with queuing. To be able 
+to adjust the ressources, implement scaling mechanism.
+
+Here I propose to implement that with Celery and Kubernetes in the following
+architecture
+
+[](./img/llm-serving-architecture.png)
+
 
 

@@ -39,7 +39,7 @@ by the p9X latency) that is acceptable.
 - You want to do that with a number of failure (errors/s) that stays below a threshold.
 - You don't won't you ressources to be saturated (%cpu or memory used).
 
-Serving an LLM is not different, though is has:
+Serving an LLM is not different, though is has some specificities:
 - generation requires a lot of memory to compute efficiently the forward pass,
 - acceptable latency is generally in the order of magnitude of seconds.
 
@@ -51,6 +51,11 @@ Here I propose to implement that with Celery and Kubernetes in the following
 architecture
 
 [](./img/llm-serving-architecture.png)
+
+## Implementation details
+
+Same image api + worker
+kubernetes PVC for llm storage
 
 
 

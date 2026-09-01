@@ -86,9 +86,20 @@ model loading is done in a separate task with the `@worker_process_init`
 decorator. The model is cached on a Persistent Volume, attached to the
 k8s Pod with a Persistent Volume Claim.
 
-### Deployement
 
-This is all deployed with k8s
+## Experimentation
+
+In order to experiment with the limits and ressources settings in
+kubernetes, I conducted a small experiments to find the minimal memory 
+that needs to be set to run the worker.
+
+My mental model was something like
+- the weights of the model are approximately 550Mb, so the minimum to
+initialize the pod should be around 600Mb.
+- inference uses additional memory for the kv cache, so the limit to
+do a generation should be a little bit higher.
+
+
 
 
 

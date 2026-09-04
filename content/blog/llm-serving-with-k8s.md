@@ -99,7 +99,30 @@ initialize the pod should be around 600Mb.
 - inference uses additional memory for the kv cache, so the limit to
 do a generation should be a little bit higher.
 
+| Memory limit | Initialization | Decoding speed |
+|:-------------|:---------------|:---------------|
+| 100M         | OOM            | —              |
+| 200M         | OOM            | —              |
+| 300M         | OOM            | —              |
+| 350M         | OOM            | —              |	
+| 400M         | OK             | 5.2 token/s    |
+| 500M         | OK             | 12.5 token/s   |
+| 1G           | OK             | 14.3 token/s   |
+| 2G           | OK             | 18.2 token/s   |
 
+### What is going on here ?
 
+There are two phenomenons that deserve an explanation:
+- the fact that serving with less than 500M works, 
+- the increase in decoding speed with memory.
+while true; do
+    date '+%F %T'
+    kubectl top pods -n helm-exercise --containers
+    sleep 60
+  done | tee pod-memory.log
 
-
+| Memory limit | Min Memory usage | Max Memory usage |
+|:-------------|:---------------|:---------------|
+| 400M         | 371M           | 	383M  |
+| 500M         | 386M             | 401M   |
+| 1G           | 388M             | 405M   |

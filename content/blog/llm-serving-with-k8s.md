@@ -105,24 +105,118 @@ do a generation should be a little bit higher.
 | 200M         | OOM            | —              |
 | 300M         | OOM            | —              |
 | 350M         | OOM            | —              |	
-| 400M         | OK             | 5.2 token/s    |
+| *400M*         | *OK*             | *5.2 token/s*    |
 | 500M         | OK             | 12.5 token/s   |
 | 1G           | OK             | 14.3 token/s   |
 | 2G           | OK             | 18.2 token/s   |
 
-### What is going on here ?
+Everything behave more or less as expected until 400M: the worker
+tries to load the model in memory, it is too big, therefore
+it is killed. But at 400M, the worker is initialized, the model
+is loaded, and you can even run inference (though very slowly).
 
-There are two phenomenons that deserve an explanation:
-- the fact that serving with less than 500M works, 
-- the increase in decoding speed with memory.
-while true; do
-    date '+%F %T'
-    kubectl top pods -n helm-exercise --containers
-    sleep 60
-  done | tee pod-memory.log
+What is going on here ? The model is 124M parameters, stored in 32 float. 
+This is 3,968bits x 124M = 496Mb, so how can it fit the 400Mb limit ?
 
-| Memory limit | Min Memory usage | Max Memory usage |
-|:-------------|:---------------|:---------------|
-| 400M         | 371M           | 	383M  |
-| 500M         | 386M             | 401M   |
-| 1G           | 388M             | 405M   |
+## How RAM is handled in the kubernetes worker
+
+There are several hypothesis that could explain this strange fact:
+
+_Is the size of the model overestimated ? No_
+
+First thing first, let's try to mesure the memory taken by the parameters, see
+if this is in line with the estimation of 496Mb above. We can do that
+by running this simple python command after the loading of the model:
+```
+parameter_bytes = sum(
+            parameter.numel() * parameter.element_size()
+            for parameter in _model.parameters()
+        )
+```
+...and we arrive at exactly at 498Mb.
+
+_Does the pod have more memory available than its limits ? No_
+
+In kubernetes on linux, the handling of the memory limit is handled to 
+a linux mechanism, named `cgroup`. A cgroup is an ensemble of processes 
+with kernel enforced boundaries, among which a max memory. It is
+possible to inspect the memory usage and limit of those cgroups
+
+```
+cat /sys/fs/cgroup/memory.max
+cat /sys/fs/cgroup/memory.current
+```
+On our cgroup of interest (the one corresponding to our "magical pod"),
+this return respecively
+
+memory.max=399998976 bits
+
+memory.current=395124736 bits
+
+Well, the memory is full, but the 400M limits is respected. But
+how is it possible that the memory used stays below the size of the
+model, while the worker is still able to serve it ?
+
+Well, turns out this is possible thanks to another mechanims: `mmap`
+
+### `mmap` or fake it until you access it
+
+`mmap` is a way to handle memory that apply a lazy loading technique to
+memory handling: the idea is that the data that needs to be in RAM is 
+split in pages, but pages are loaded in RAM when the process actually
+accesses it.	
+
+Let say that you have data that can be split in four pages, but only
+two are used by the process. In practice, only those pages need to
+be resident in RAM:
+```
+data
+[ A ][ B ][ C ][ D ]
+
+RAM
+[ A ][ B ]
+```
+When page D is accessed, this causes a page fault, Linux makes it
+available in RAM and the process continues:
+
+```
+data
+[ A ][ B ][ C ][ D ]
+
+RAM
+[ A ][ B ][ D ]
+```
+
+But what happens when there is not enough RAM to handle the whole data ?
+The Linux kernel can reclaim file-backed pages: it removes somes pages that
+can be loaded again from later from the original file.
+
+```
+RAM
+[ A ][ B ][ D ]
+        ↓
+page C is needed
+        ↓
+Linux kernel reclaims page B
+        ↓
+RAM
+[ A ][   ][ D ]
+        ↓
+page C is faulted in
+        ↓
+RAM
+[ A ][ C ][ D ]
+```
+
+That is roughly what happens with our model ! The model can expose more weights
+than can fit in the pods' RAM at once, and as inference needs to access
+different pages, Linux brings them into RAM.
+When the cgroup memory limit creates pressure, reclaimable pages can be
+discarded and later faulted back in when needed.
+
+This is why the model can run with a memory limit smaller than its logical
+size. It also explains why inference is slower with smaller pods:
+the kernel has to perform more reclaim and more page faults/refaults.
+
+
+

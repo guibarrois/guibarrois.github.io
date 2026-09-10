@@ -1,12 +1,10 @@
 +++
-title = "Serving an LLM using Celery and Kubernetes"
+title = "Memory usage of an LLM served via Celery and Kubernetes"
 date = "2026-08-25T00:00:00+00:00"
 
 description = "Architecture of for a resilient and scalable system to serve a local LLM, using Celery and Kubernetes"
 
-tags = ["ml-systems inference"]` for the worker
-
-A redis image, that serve both as the broker and the backend is also built.
+tags = ["ml-systems inference"]
 +++
 
 ## Serving an LLM
@@ -149,9 +147,10 @@ cat /sys/fs/cgroup/memory.current
 On our cgroup of interest (the one corresponding to our "magical pod"),
 this return respecively
 
+```
 memory.max=399998976 bits
-
 memory.current=395124736 bits
+```
 
 Well, the memory is full, but the 400M limits is respected. But
 how is it possible that the memory used stays below the size of the
@@ -208,15 +207,50 @@ RAM
 [ A ][ C ][ D ]
 ```
 
-That is roughly what happens with our model ! The model can expose more weights
-than can fit in the pods' RAM at once, and as inference needs to access
-different pages, Linux brings them into RAM.
-When the cgroup memory limit creates pressure, reclaimable pages can be
-discarded and later faulted back in when needed.
+So maybe this is what is going on whith our model: it is actually not
+fully loaded into RAM, and during for instance inference, there
+is a succession of reclaiming / faulting, for instance to load
+successively the weights of the layers.
 
-This is why the model can run with a memory limit smaller than its logical
-size. It also explains why inference is slower with smaller pods:
-the kernel has to perform more reclaim and more page faults/refaults.
+That would also explain the increase in latency observed when the 
+memory limit on the pod decreases: because memory is smaller, there are more
+reclaiming / faulting cycles to do, leading to more disk access, and 
+more latency.
 
+To confirm that it is what is going on, we can analyze of the memory
+is distributed anonymous (non file-backed,therefore non reclaimable) and file-backed
+(memory):
 
+```
+cat /sys/fs/cgroup/memory.stat
+```
+returns
+```
+anon 375549952
+file 14557184
+```
 
+This was not what I was expected... Only around 15MB of the RAM is file-backed,
+the rest is anonymous. For my explanation about mmap to be true,
+that would mean that the 498MB of the weights are distributed:
+
+```
+anon memory + file-backed memory + file-backed not in memory = 498MB
+with file-backed memory ~= 15MB
+and  file-backed memory ~= 108Mb
+```
+
+In the specific case of the 400MB memory limit, the file-backed memory is
+around 15MB. Sothat means that the "sliding memory subset" that allows to read 
+successively the rest of the weights that are not in memory is quite small.
+Not impossible, but less than expected !
+
+## Conclusion
+
+It would probably be possible to continue the investigation to rule out 
+or confirm this hypothesis, but at this point, I feel I have already learned 
+a lot about memory limit and memory handling in cgroup, so I leave the 
+rest of the investigation to a motivated reader.
+
+If someone has an alternative explanation for the 400MB worker serving
+a 498MB model, I would also be very glad to hear it !

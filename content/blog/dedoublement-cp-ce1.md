@@ -9,15 +9,18 @@ tags = ["éducation", "politique", "France"]
 
 # Augmenter le taux d'encadrement, un idée ancienne et étudiée
 
-Si vous avez déjà tenté de faire un UNO avec des enfants de 6 ans, vous avez pu constater par vous même qu'il est plus facile de le faire avec un groupe de 4 qu'un groupe de 8. Avec 4 enfants, vous pouvez réexpliquer les règles au petit Mathis qui n'a jamais joué, chanter une chanson si le temps est un peu long entre deux tours. Avec un groupe de 8, vous aurez de la chance si vous arrivez à distribuer 7 cartes à tout le monde, et vous aurez accompli un exploit si vous parvenez un faire un tour complet.
+Quiconque a déjà tenté d'organiser une partie de UNO avec des enfants de 6 ans comprend pourquoi dédoubler des classes de CP et de CE1 peut favoriser l'acquisition de compétences. Avec 4 enfants, on du temps pour expliquer les consignes, on se rend compte si le règle du change de sens est bien claire pour tout le monde, on peut suivre la partie pour s'assurer qu'elle est réalisées dans les règles de l'art (non, on n'a pas le droit de cumuler les +2). Avec 8 enfants, on sera satisfait si on arrive à distribuer 7 cartes à tout le monde et à jouer dans le bon ordre.
+Pour une classe de CP, on peut imaginer le même genre d'effet: moins d'élèves, c'est plus de temps pour aller aider ceux qui sont en difficulté, moins de temps à demander le silence, moins de distraction possibles.
 
-Ce n'est pas très étonnant: un enfant est naturellement plus intéressés par ce qui lui raconte son copain que par un adulte qui lui explique que non, on ne peut pas mettre un +2 sur un +4.
+L'autre point important est que la réduction des effectifs semble se suffir à elle même: que l'on soit grand maître international de UNO, ou débutant, ce sera plus facile avec un groupe de 4 qu'avec un groupe de 8. Pas besoin non plus de formation spécifique pour qu'il y ait un effet. Dans le cadre scolaire, au premier ordre, cela signifie qu'il n'y a pas besoin de former spécifiquement les institeurs, d'imaginer de nouveaux programmes ou de repenser entièrement l'organisation du temps scolaire.
 
-Si la salle de classe est un environnement autrement plus complexe, et que les instituteurs ont infiniement plus de méthode et de patience que moi, on sent intuitivement que la même logique peut s'appliquer: il est plus facile de faire classe à 12 élèves qu'à 24. 
+Sur le papier on a donc une idée simple, facile à mettre en oeuvre, qui peut potentiellement produire des effets immédiats.
 
 # La réforme en France
 
-En 2021, la Direction de l'évaluation de la prospective et de la performance (DEPP) sort une analyse très détaillées de l'impact de la réforme sur les premières cohortes concernées, et essaye d'en mesurer l'efficacité. L'objectif de cette réforme est en premier lieu d'améliorer les résultats scolaires des élèves. La DEPP va donc regarder la progression des élèves de CP et CE1 en début en fin d'année. La question est de savoir si les élèves de classes dédoublées ont plus progressé que les autres.
+En France la mesure est mise en place en 2017. 2200 classes de CP en zone d'éduction prioritaire renforcée (REP+) sont dédoublées, soit 60000 élèves concernés. Elle est poursuivie en 2018 et 2019, en CP et CE1. 
+
+En 2021, la Direction de l'évaluation de la prospective et de la performance (DEPP) sort une analyse très détaillée de l'impact de la réforme sur les premières cohortes concernées, et essaye d'en mesurer l'efficacité. L'objectif de cette réforme est en premier lieu d'améliorer les résultats scolaires des élèves. La DEPP va donc regarder la progression des élèves de CP et CE1 en début en fin d'année. La question est de savoir si les élèves de classes dédoublées ont plus progressé que les autres.
 
 On ne peut pas les comparer à l'ensemble des élèves: les élèves de REP+ ont des caractéristiques socio-démographiques particulières, qui jouent sur leur parcours scolaire et leur progression. On va donc chercher des groupes d'élèves "similaires", mais pas en REP+ (donc ne bénéficiant pas de classes dédoublées). Ce sont les classes "proches REP+". Comme la similarité n'est pas parfaite, la DEPP fait également des traitement statistiques pour compenser les écarts qui subsistent entre les classes REP+ et proches REP+. 
 
